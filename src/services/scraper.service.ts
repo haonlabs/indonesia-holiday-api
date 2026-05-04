@@ -58,7 +58,9 @@ const OFFICIAL_BASE_URLS = [
 
 const REQUEST_HEADERS = {
   "User-Agent":
-    "indonesia-holiday-api/1.0 (+https://github.com/example/indonesia-holiday-api)"
+    "Mozilla/5.0 (compatible; indonesia-holiday-api/1.0; +https://github.com/example/indonesia-holiday-api)",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7",
+  "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.7,en;q=0.6"
 };
 
 function compactText(text: string): string {
@@ -190,14 +192,29 @@ function extractLines(html: string): string[] {
   $("script, style, noscript, iframe").remove();
 
   const lines = new Set<string>();
+
+  function addTextLines(text: string) {
+    for (const line of text.split(/\r?\n/)) {
+      const compactedLine = compactText(line);
+      if (compactedLine) {
+        lines.add(compactedLine);
+      }
+    }
+  }
+
   $("article, main, body")
     .find("h1, h2, h3, h4, p, li, td, th")
     .each((_index, element) => {
-      const text = compactText($(element).text());
-      if (text) {
-        lines.add(text);
-      }
+      addTextLines($(element).text());
     });
+
+  $("article, main").each((_index, element) => {
+    addTextLines($(element).text());
+  });
+
+  $("body").each((_index, element) => {
+    addTextLines($(element).text());
+  });
 
   return [...lines];
 }
@@ -278,6 +295,7 @@ function buildSearchDiscoveryUrls(year: number): string[] {
   );
 
   return [
+    `https://s.jina.ai/${query}`,
     `https://duckduckgo.com/html/?q=${query}`,
     `https://www.bing.com/search?q=${query}`
   ];
@@ -288,12 +306,31 @@ function range(start: number, end: number): number[] {
 }
 
 function buildGenericArticleCandidates(year: number): string[] {
-  const slugs: string[] = [
+  const slugs: string[] = [];
+  const likelyCounts = [
+    [17, 8],
+    [17, 10],
+    [16, 7],
+    [16, 8],
+    [15, 4],
+    [15, 5],
+    [14, 4],
+    [14, 5]
+  ];
+
+  for (const [publicHolidayCount, cutiBersamaCount] of likelyCounts) {
+    slugs.push(
+      `pemerintah-tetapkan-${publicHolidayCount}-hari-libur-nasional-dan-${cutiBersamaCount}-cuti-bersama-tahun-${year}`,
+      `pemerintah-tetapkan-${publicHolidayCount}-hari-libur-nasional-dan-${cutiBersamaCount}-hari-cuti-bersama-tahun-${year}`
+    );
+  }
+
+  slugs.push(
     `pemerintah-tetapkan-hari-libur-nasional-dan-cuti-bersama-tahun-${year}`,
     `skb-3-menteri-libur-nasional-dan-cuti-bersama-tahun-${year}`,
     `index.php/pemerintah-tetapkan-hari-libur-nasional-dan-cuti-bersama-tahun-${year}`,
     `index.php/skb-3-menteri-libur-nasional-dan-cuti-bersama-tahun-${year}`
-  ];
+  );
 
   for (const publicHolidayCount of range(10, 25)) {
     for (const cutiBersamaCount of range(0, 15)) {
@@ -372,6 +409,15 @@ function extractCandidateUrls(html: string, sourceUrl: string, year: number): st
     }
   });
 
+  const officialUrlPattern =
+    /https?:\/\/(?:www\d?\.)?kemenkopmk\.go\.id\/[^\s"'<>)]*libur[^\s"'<>)]*cuti[^\s"'<>)]*/gi;
+  for (const match of html.matchAll(officialUrlPattern)) {
+    const candidateUrl = match[0].replace(/[.,;]+$/g, "");
+    if (candidateUrl.includes(String(year)) && isOfficialKemenkoPmkUrl(candidateUrl)) {
+      candidates.push(candidateUrl.split("#")[0]);
+    }
+  }
+
   return unique(candidates);
 }
 
@@ -427,6 +473,17 @@ async function fetchHtml(
   }
 }
 
+async function fetchReaderHtml(url: string): Promise<string | undefined> {
+  if (!isOfficialKemenkoPmkUrl(url)) {
+    return undefined;
+  }
+
+  return fetchHtml(`https://r.jina.ai/${url}`, {
+    timeoutMs: 15000,
+    warnOnFailure: false
+  });
+}
+
 function isValidHolidaySource(html: string, year: number): boolean {
   const holidays = parseHolidayHtml(html, year);
   return (
@@ -454,14 +511,21 @@ async function findFirstValidCandidate(
         unavailableOrigins,
         warnOnFailure: false
       });
-      if (!html || !isValidHolidaySource(html, year)) {
+      if (html && isValidHolidaySource(html, year)) {
+        sourceDocument = {
+          url: candidateUrl,
+          html
+        };
         continue;
       }
 
-      sourceDocument = {
-        url: candidateUrl,
-        html
-      };
+      const readerHtml = await fetchReaderHtml(candidateUrl);
+      if (readerHtml && isValidHolidaySource(readerHtml, year)) {
+        sourceDocument = {
+          url: candidateUrl,
+          html: readerHtml
+        };
+      }
     }
   };
 
