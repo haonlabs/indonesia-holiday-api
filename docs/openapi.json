@@ -1,0 +1,281 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Indonesia Holiday API",
+    "description": "REST API for Indonesian public holidays and cuti bersama.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://your-render-service.onrender.com",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health"
+    },
+    {
+      "name": "Holidays"
+    },
+    {
+      "name": "Admin"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "API is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "ok"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/holidays": {
+      "get": {
+        "tags": ["Holidays"],
+        "summary": "List Indonesian holidays",
+        "description": "Returns Indonesian public holidays and cuti bersama. Supports optional filtering by year and holiday type.",
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "required": false,
+            "description": "Holiday year.",
+            "schema": {
+              "type": "integer",
+              "example": 2026,
+              "minimum": 1900,
+              "maximum": 2200
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "description": "Holiday type.",
+            "schema": {
+              "$ref": "#/components/schemas/HolidayType"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Holiday list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Holiday"
+                  }
+                },
+                "example": [
+                  {
+                    "id": "4ab81aa3-2b20-4c7d-b2ea-60236c133f50",
+                    "date": "2026-01-01",
+                    "name": "Tahun Baru 2026 Masehi",
+                    "type": "PUBLIC_HOLIDAY",
+                    "year": 2026,
+                    "createdAt": "2026-05-04T02:00:00.000Z",
+                    "updatedAt": "2026-05-04T02:00:00.000Z"
+                  }
+                ]
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/admin/scrape": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Trigger holiday scraper",
+        "description": "Runs the scraper for a requested year, upserts the result into the database, and returns the inserted/updated count.",
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "required": true,
+            "description": "Holiday year to scrape.",
+            "schema": {
+              "type": "integer",
+              "example": 2026,
+              "minimum": 1900,
+              "maximum": 2200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scrape completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScrapeResponse"
+                },
+                "example": {
+                  "year": 2026,
+                  "sourceUrl": "https://api-hari-libur.vercel.app/api?year=2026",
+                  "scrapedCount": 23,
+                  "upsertedCount": 23
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "422": {
+            "description": "Source could not be parsed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HolidayType": {
+        "type": "string",
+        "enum": ["PUBLIC_HOLIDAY", "CUTI_BERSAMA"],
+        "example": "PUBLIC_HOLIDAY"
+      },
+      "Holiday": {
+        "type": "object",
+        "required": ["id", "date", "name", "type", "year", "createdAt", "updatedAt"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-01-01"
+          },
+          "name": {
+            "type": "string",
+            "example": "Tahun Baru 2026 Masehi"
+          },
+          "type": {
+            "$ref": "#/components/schemas/HolidayType"
+          },
+          "year": {
+            "type": "integer",
+            "example": 2026
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok"
+          }
+        }
+      },
+      "ScrapeResponse": {
+        "type": "object",
+        "required": ["year", "sourceUrl", "scrapedCount", "upsertedCount"],
+        "properties": {
+          "year": {
+            "type": "integer",
+            "example": 2026
+          },
+          "sourceUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "scrapedCount": {
+            "type": "integer",
+            "example": 23
+          },
+          "upsertedCount": {
+            "type": "integer",
+            "example": 23
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "nullable": true
+          }
+        }
+      }
+    },
+    "responses": {
+      "ValidationError": {
+        "description": "Validation failed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "message": "Internal server error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

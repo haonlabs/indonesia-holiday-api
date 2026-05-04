@@ -66,6 +66,32 @@ GET /holidays?type=CUTI_BERSAMA
 POST /admin/scrape?year=2026
 ```
 
+## API Documentation
+
+Swagger UI documentation is available in the `docs` folder for GitHub Pages:
+
+```text
+docs/index.html
+docs/openapi.json
+```
+
+To publish it:
+
+```text
+GitHub repo -> Settings -> Pages -> Build and deployment
+Source: Deploy from a branch
+Branch: main
+Folder: /docs
+```
+
+After GitHub Pages is enabled, open the generated Pages URL. Enter your deployed API base URL, for example:
+
+```text
+https://your-render-service.onrender.com
+```
+
+Then use Swagger UI's `Try it out` buttons to test requests directly from the documentation page. This works because the API enables CORS.
+
 ## Sample API Response
 
 ```json
