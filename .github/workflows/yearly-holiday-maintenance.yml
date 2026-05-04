@@ -1,0 +1,51 @@
+name: Yearly Holiday Maintenance
+
+on:
+  schedule:
+    # Runs every January 1 at 07:15 WIB.
+    - cron: "15 0 1 1 *"
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Holiday year to scrape. Leave empty to use the current UTC year."
+        required: false
+        type: string
+      retention_years:
+        description: "How many years of holiday data to retain."
+        required: false
+        default: "5"
+        type: string
+
+jobs:
+  scrape-and-cleanup:
+    name: Scrape holidays and clean old data
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SCRAPER_SOURCE_URL_TEMPLATE: ${{ secrets.SCRAPER_SOURCE_URL_TEMPLATE }}
+      SCRAPE_YEAR: ${{ github.event_name == 'workflow_dispatch' && inputs.year || '' }}
+      RETENTION_YEARS: ${{ github.event_name == 'workflow_dispatch' && inputs.retention_years || '5' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Apply database migrations
+        run: npm run db:deploy
+
+      - name: Scrape yearly holidays and clean old data
+        run: npm run scrape:yearly

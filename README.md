@@ -85,4 +85,25 @@ POST /admin/scrape?year=2026
 
 The scraper exposes `scrapeHolidays(year: number)`. It fetches a trusted public page, detects separate sections for `Hari Libur Nasional` and `Cuti Bersama`, normalizes dates to `YYYY-MM-DD`, and upserts records using the unique `(date, type)` constraint.
 
-The built-in 2026 source is a government-domain announcement from Kabupaten Grobogan that explicitly labels both holiday categories. For other years, configure `SCRAPER_SOURCE_URL_TEMPLATE` with a `{year}` placeholder.
+The scraper discovers official Kemenko PMK source pages at runtime for the requested year. It searches official Kemenko PMK pages, extracts candidate links mentioning `libur nasional`, `cuti bersama`, and the requested year, then accepts a source only after it can parse both `PUBLIC_HOLIDAY` and `CUTI_BERSAMA` records from the page. `SCRAPER_SOURCE_URL_TEMPLATE` remains available as an optional fallback.
+
+## Yearly Automation
+
+The GitHub Actions workflow at `.github/workflows/yearly-holiday-maintenance.yml` runs every January 1 at 07:15 WIB. It:
+
+```text
+1. Installs dependencies
+2. Generates Prisma Client
+3. Applies migrations
+4. Scrapes the current year
+5. Deletes holiday data older than 5 years
+```
+
+Add these GitHub repository secrets:
+
+```text
+DATABASE_URL=<your Supabase session pooler URL>
+SCRAPER_SOURCE_URL_TEMPLATE=<optional fallback URL template containing {year}>
+```
+
+You can also run it manually from the GitHub Actions tab and provide a `year`, for example `2026`.

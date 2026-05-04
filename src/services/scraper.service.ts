@@ -21,8 +21,15 @@ export type ScrapeResult = {
   holidays: ScrapedHoliday[];
 };
 
-const DEFAULT_SOURCE_BY_YEAR: Record<number, string> = {
-  2026: "https://beta.grobogan.go.id/pengumuman/libur-nasional-dan-cuti-bersama-tahun-2026"
+type SourceDocument = {
+  url: string;
+  html: string;
+};
+
+type FetchHtmlOptions = {
+  timeoutMs?: number;
+  unavailableOrigins?: Set<string>;
+  warnOnFailure?: boolean;
 };
 
 const MONTHS: Record<string, number> = {
@@ -43,21 +50,16 @@ const MONTHS: Record<string, number> = {
 const WEEKDAYS =
   /\b(senin|selasa|rabu|kamis|jumat|jum'at|sabtu|minggu|ahad)\b/gi;
 
-function getSourceUrl(year: number): string {
-  const defaultSource = DEFAULT_SOURCE_BY_YEAR[year];
-  if (defaultSource) {
-    return defaultSource;
-  }
+const OFFICIAL_BASE_URLS = [
+  "https://www.kemenkopmk.go.id",
+  "https://kemenkopmk.go.id",
+  "https://www2.kemenkopmk.go.id"
+];
 
-  if (env.SCRAPER_SOURCE_URL_TEMPLATE) {
-    return env.SCRAPER_SOURCE_URL_TEMPLATE.replace("{year}", String(year));
-  }
-
-  throw new HttpError(
-    400,
-    `No scraper source configured for ${year}. Set SCRAPER_SOURCE_URL_TEMPLATE to scrape this year.`
-  );
-}
+const REQUEST_HEADERS = {
+  "User-Agent":
+    "indonesia-holiday-api/1.0 (+https://github.com/example/indonesia-holiday-api)"
+};
 
 function compactText(text: string): string {
   return text
@@ -236,6 +238,325 @@ export function parseHolidayHtml(html: string, year: number): ScrapedHoliday[] {
   );
 }
 
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function isOfficialKemenkoPmkUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname === "kemenkopmk.go.id" || hostname.endsWith(".kemenkopmk.go.id");
+  } catch {
+    return false;
+  }
+}
+
+function buildDiscoveryUrls(year: number): string[] {
+  const query = encodeURIComponent(`libur nasional cuti bersama tahun ${year}`);
+  const pathQuery = encodeURIComponent(`libur nasional cuti bersama ${year}`).replace(
+    /%20/g,
+    "+"
+  );
+
+  return unique(
+    OFFICIAL_BASE_URLS.flatMap((baseUrl) => [
+      baseUrl,
+      `${baseUrl}/sitemap.xml`,
+      `${baseUrl}/sitemap_index.xml`,
+      `${baseUrl}/?s=${query}`,
+      `${baseUrl}/search?search=${query}`,
+      `${baseUrl}/search/node?keys=${query}`,
+      `${baseUrl}/search/node/${pathQuery}`,
+      `${baseUrl}/index.php/search/node/${pathQuery}`
+    ])
+  );
+}
+
+function buildSearchDiscoveryUrls(year: number): string[] {
+  const query = encodeURIComponent(
+    `site:kemenkopmk.go.id libur nasional cuti bersama tahun ${year}`
+  );
+
+  return [
+    `https://duckduckgo.com/html/?q=${query}`,
+    `https://www.bing.com/search?q=${query}`
+  ];
+}
+
+function range(start: number, end: number): number[] {
+  return Array.from({ length: end - start + 1 }, (_value, index) => start + index);
+}
+
+function buildGenericArticleCandidates(year: number): string[] {
+  const slugs: string[] = [
+    `pemerintah-tetapkan-hari-libur-nasional-dan-cuti-bersama-tahun-${year}`,
+    `skb-3-menteri-libur-nasional-dan-cuti-bersama-tahun-${year}`,
+    `index.php/pemerintah-tetapkan-hari-libur-nasional-dan-cuti-bersama-tahun-${year}`,
+    `index.php/skb-3-menteri-libur-nasional-dan-cuti-bersama-tahun-${year}`
+  ];
+
+  for (const publicHolidayCount of range(10, 25)) {
+    for (const cutiBersamaCount of range(0, 15)) {
+      slugs.push(
+        `pemerintah-tetapkan-${publicHolidayCount}-hari-libur-nasional-dan-${cutiBersamaCount}-cuti-bersama-tahun-${year}`,
+        `pemerintah-tetapkan-${publicHolidayCount}-hari-libur-nasional-dan-${cutiBersamaCount}-hari-cuti-bersama-tahun-${year}`
+      );
+    }
+  }
+
+  return unique(
+    slugs.flatMap((slug) =>
+      OFFICIAL_BASE_URLS.map((baseUrl) => `${baseUrl}/${slug}`)
+    )
+  );
+}
+
+function resolveCandidateUrl(href: string, sourceUrl: string): string | undefined {
+  try {
+    const url = new URL(href, sourceUrl);
+
+    const redirectParam =
+      url.searchParams.get("uddg") ||
+      url.searchParams.get("q") ||
+      url.searchParams.get("url");
+
+    if (redirectParam && redirectParam.startsWith("http")) {
+      return new URL(redirectParam).toString();
+    }
+
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function extractCandidateUrls(html: string, sourceUrl: string, year: number): string[] {
+  const $ = cheerio.load(html);
+  const candidates: string[] = [];
+
+  $("a[href]").each((_index, element) => {
+    const href = $(element).attr("href");
+    if (!href) {
+      return;
+    }
+
+    const label = compactText(`${$(element).text()} ${href}`).toLowerCase();
+    if (
+      !label.includes(String(year)) ||
+      !label.includes("libur") ||
+      !label.includes("cuti")
+    ) {
+      return;
+    }
+
+    const candidateUrl = resolveCandidateUrl(href, sourceUrl);
+    if (!candidateUrl) {
+      return;
+    }
+
+    if (isOfficialKemenkoPmkUrl(candidateUrl)) {
+      candidates.push(candidateUrl.split("#")[0]);
+    }
+  });
+
+  $("loc").each((_index, element) => {
+    const loc = compactText($(element).text());
+    const label = loc.toLowerCase();
+    if (
+      label.includes(String(year)) &&
+      label.includes("libur") &&
+      label.includes("cuti") &&
+      isOfficialKemenkoPmkUrl(loc)
+    ) {
+      candidates.push(loc.split("#")[0]);
+    }
+  });
+
+  return unique(candidates);
+}
+
+function getOrigin(url: string): string | undefined {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function isUnavailableOriginError(error: unknown): boolean {
+  return (
+    axios.isAxiosError(error) &&
+    ["ECONNABORTED", "ENOTFOUND", "ETIMEDOUT", "ECONNRESET"].includes(
+      String(error.code)
+    ) &&
+    !error.response
+  );
+}
+
+async function fetchHtml(
+  url: string,
+  options: FetchHtmlOptions = {}
+): Promise<string | undefined> {
+  const origin = getOrigin(url);
+  if (origin && options.unavailableOrigins?.has(origin)) {
+    return undefined;
+  }
+
+  try {
+    const response = await axios.get<string>(url, {
+      timeout: options.timeoutMs ?? 15000,
+      headers: REQUEST_HEADERS,
+      responseType: "text",
+      validateStatus: (status) => status >= 200 && status < 400
+    });
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      logger.debug({ url }, "Candidate holiday source returned 404");
+      return undefined;
+    }
+
+    if (origin && isUnavailableOriginError(error)) {
+      options.unavailableOrigins?.add(origin);
+    }
+
+    const log = options.warnOnFailure === false ? logger.debug : logger.warn;
+    log.call(logger, { url, error }, "Failed to fetch candidate holiday source");
+    return undefined;
+  }
+}
+
+function isValidHolidaySource(html: string, year: number): boolean {
+  const holidays = parseHolidayHtml(html, year);
+  return (
+    holidays.some((holiday) => holiday.type === HolidayType.PUBLIC_HOLIDAY) &&
+    holidays.some((holiday) => holiday.type === HolidayType.CUTI_BERSAMA)
+  );
+}
+
+async function findFirstValidCandidate(
+  candidateUrls: Iterable<string>,
+  year: number
+): Promise<SourceDocument | undefined> {
+  const urls = unique([...candidateUrls]);
+  let currentIndex = 0;
+  let sourceDocument: SourceDocument | undefined;
+  const unavailableOrigins = new Set<string>();
+
+  const worker = async () => {
+    while (!sourceDocument && currentIndex < urls.length) {
+      const candidateUrl = urls[currentIndex];
+      currentIndex += 1;
+
+      const html = await fetchHtml(candidateUrl, {
+        timeoutMs: 3000,
+        unavailableOrigins,
+        warnOnFailure: false
+      });
+      if (!html || !isValidHolidaySource(html, year)) {
+        continue;
+      }
+
+      sourceDocument = {
+        url: candidateUrl,
+        html
+      };
+    }
+  };
+
+  await Promise.all(Array.from({ length: 8 }, () => worker()));
+  return sourceDocument;
+}
+
+async function discoverOfficialSourceDocument(year: number): Promise<SourceDocument | undefined> {
+  logger.info({ year }, "Discovering official holiday source");
+
+  const candidateUrls = new Set<string>(buildGenericArticleCandidates(year));
+  const directCandidate = await findFirstValidCandidate(candidateUrls, year);
+  if (directCandidate) {
+    logger.info(
+      { year, sourceUrl: directCandidate.url },
+      "Discovered official holiday source"
+    );
+    return directCandidate;
+  }
+
+  const searchCandidateUrls = new Set<string>();
+  for (const discoveryUrl of buildSearchDiscoveryUrls(year)) {
+    const html = await fetchHtml(discoveryUrl, {
+      timeoutMs: 10000,
+      warnOnFailure: false
+    });
+    if (!html) {
+      continue;
+    }
+
+    for (const candidateUrl of extractCandidateUrls(html, discoveryUrl, year)) {
+      searchCandidateUrls.add(candidateUrl);
+    }
+  }
+
+  const searchCandidate = await findFirstValidCandidate(searchCandidateUrls, year);
+  if (searchCandidate) {
+    logger.info(
+      { year, sourceUrl: searchCandidate.url },
+      "Discovered official holiday source"
+    );
+    return searchCandidate;
+  }
+
+  const unavailableDiscoveryOrigins = new Set<string>();
+  for (const discoveryUrl of buildDiscoveryUrls(year)) {
+    const html = await fetchHtml(discoveryUrl, {
+      timeoutMs: 5000,
+      unavailableOrigins: unavailableDiscoveryOrigins
+    });
+    if (!html) {
+      continue;
+    }
+
+    if (isValidHolidaySource(html, year)) {
+      return { url: discoveryUrl, html };
+    }
+
+    for (const candidateUrl of extractCandidateUrls(html, discoveryUrl, year)) {
+      candidateUrls.add(candidateUrl);
+    }
+  }
+
+  const discoveredSource = await findFirstValidCandidate(candidateUrls, year);
+  if (discoveredSource) {
+    logger.info(
+      { year, sourceUrl: discoveredSource.url },
+      "Discovered official holiday source"
+    );
+    return discoveredSource;
+  }
+
+  return undefined;
+}
+
+async function getSourceDocument(year: number): Promise<SourceDocument> {
+  const discoveredSource = await discoverOfficialSourceDocument(year);
+  if (discoveredSource) {
+    return discoveredSource;
+  }
+
+  if (env.SCRAPER_SOURCE_URL_TEMPLATE) {
+    const url = env.SCRAPER_SOURCE_URL_TEMPLATE.replace("{year}", String(year));
+    const html = await fetchHtml(url);
+    if (html && isValidHolidaySource(html, year)) {
+      return { url, html };
+    }
+  }
+
+  throw new HttpError(
+    400,
+    `Could not discover an official holiday source for ${year}. The government may not have published it yet.`
+  );
+}
+
 async function upsertHolidays(holidays: ScrapedHoliday[], year: number): Promise<number> {
   let count = 0;
 
@@ -265,18 +586,11 @@ async function upsertHolidays(holidays: ScrapedHoliday[], year: number): Promise
 }
 
 export async function scrapeHolidays(year: number): Promise<ScrapeResult> {
-  const sourceUrl = getSourceUrl(year);
+  const sourceDocument = await getSourceDocument(year);
+  const sourceUrl = sourceDocument.url;
   logger.info({ year, sourceUrl }, "Starting holiday scrape");
 
-  const response = await axios.get<string>(sourceUrl, {
-    timeout: 15000,
-    headers: {
-      "User-Agent":
-        "indonesia-holiday-api/1.0 (+https://github.com/example/indonesia-holiday-api)"
-    }
-  });
-
-  const holidays = parseHolidayHtml(response.data, year);
+  const holidays = parseHolidayHtml(sourceDocument.html, year);
   if (!holidays.length) {
     throw new HttpError(422, "No holidays could be parsed from the source page", {
       sourceUrl

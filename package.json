@@ -15,7 +15,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "scrape": "tsx src/scripts/scrape.ts"
+    "scrape": "tsx src/scripts/scrape.ts",
+    "scrape:yearly": "tsx src/scripts/yearly-maintenance.ts"
   },
   "keywords": [
     "indonesia",
