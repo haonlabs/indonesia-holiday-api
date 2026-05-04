@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
+import { env } from "./config/env";
 import { logger } from "./lib/logger";
 import { errorMiddleware } from "./middleware/error.middleware";
 import { adminRouter } from "./routes/admin.routes";
@@ -17,6 +18,10 @@ app.use(
     logger,
   }),
 );
+
+app.get("/", (_req, res) => {
+  res.redirect(302, env.DOCS_URL);
+});
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });

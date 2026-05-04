@@ -7,6 +7,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().url(),
+  DOCS_URL: z.string().url().default("https://haon.github.io/indonesia-holiday-api/"),
   SCRAPER_SOURCE_URL_TEMPLATE: z.preprocess(
     (value) => (value === "" ? undefined : value),
     z.string().url().optional()

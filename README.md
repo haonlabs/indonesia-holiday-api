@@ -87,10 +87,12 @@ Folder: /docs
 After GitHub Pages is enabled, open the generated Pages URL. Enter your deployed API base URL, for example:
 
 ```text
-https://your-render-service.onrender.com
+https://indonesia-holiday-api.onrender.com
 ```
 
 Then use Swagger UI's `Try it out` buttons to test requests directly from the documentation page. This works because the API enables CORS.
+
+The API root route (`GET /`) redirects to `DOCS_URL`, so opening the Render base URL sends users to the Swagger documentation.
 
 ## Sample API Response
 
