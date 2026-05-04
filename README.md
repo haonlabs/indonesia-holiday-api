@@ -33,6 +33,27 @@ DATABASE_URL=<your Supabase session pooler URL on port 5432>
 
 Do not run `prisma db push` in Render's build command. Builds should compile the app; migrations should run as a pre-deploy step or manually with `npm run db:deploy`.
 
+On Render free tier, pre-deploy commands are unavailable. Use:
+
+```text
+Build Command: npm install && npm run build
+Start Command: npm start
+```
+
+Then run migrations manually from your machine before or after deploying:
+
+```bash
+npm run db:deploy
+```
+
+There is also an emergency fallback start command:
+
+```text
+Start Command: npm run start:migrate
+```
+
+Use that only if you cannot run migrations elsewhere, because Render free services can cold-start and this would check migrations every time the service starts.
+
 ## Endpoints
 
 ```http
