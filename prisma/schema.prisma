@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Holiday {
+  id        String      @id @default(uuid())
+  date      DateTime
+  name      String
+  type      HolidayType
+  year      Int
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([date, type], name: "holiday_date_type_unique", map: "holiday_date_type_unique")
+  @@index([year])
+  @@index([type])
+}
+
+enum HolidayType {
+  PUBLIC_HOLIDAY
+  CUTI_BERSAMA
+}
