@@ -45,7 +45,9 @@ jobs:
         run: npm run prisma:generate
 
       - name: Apply database migrations
+        timeout-minutes: 3
         run: npm run db:deploy
 
       - name: Scrape yearly holidays and clean old data
+        timeout-minutes: 7
         run: npm run scrape:yearly
