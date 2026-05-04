@@ -14,6 +14,25 @@ npm run dev
 
 Set `DATABASE_URL` to your Supabase PostgreSQL connection string.
 
+## Render Deployment
+
+Use these Render settings:
+
+```text
+Build Command: npm install && npm run build
+Pre-Deploy Command: npm run db:deploy
+Start Command: npm start
+```
+
+Required environment variables:
+
+```text
+NODE_ENV=production
+DATABASE_URL=<your Supabase session pooler URL on port 5432>
+```
+
+Do not run `prisma db push` in Render's build command. Builds should compile the app; migrations should run as a pre-deploy step or manually with `npm run db:deploy`.
+
 ## Endpoints
 
 ```http
