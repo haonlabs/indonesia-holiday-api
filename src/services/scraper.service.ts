@@ -26,6 +26,11 @@ type SourceDocument = {
   html: string;
 };
 
+type ProviderResult = {
+  sourceUrl: string;
+  holidays: ScrapedHoliday[];
+};
+
 type FetchHtmlOptions = {
   timeoutMs?: number;
   unavailableOrigins?: Set<string>;
@@ -62,6 +67,10 @@ const REQUEST_HEADERS = {
   Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7",
   "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.7,en;q=0.6"
 };
+
+const SCRAPER_HARD_TIMEOUT_MS = 90_000;
+const STRUCTURED_PROVIDER_TIMEOUT_MS = 10_000;
+const HTML_PROVIDER_TIMEOUT_MS = 25_000;
 
 function compactText(text: string): string {
   return text
@@ -250,13 +259,22 @@ export function parseHolidayHtml(html: string, year: number): ScrapedHoliday[] {
     deduplicated.set(`${holiday.date}:${holiday.type}`, holiday);
   }
 
-  return [...deduplicated.values()].sort((a, b) =>
-    `${a.date}:${a.type}`.localeCompare(`${b.date}:${b.type}`)
-  );
+  return deduplicateHolidays([...deduplicated.values()]);
 }
 
 function unique(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function deduplicateHolidays(holidays: ScrapedHoliday[]): ScrapedHoliday[] {
+  const deduplicated = new Map<string, ScrapedHoliday>();
+  for (const holiday of holidays) {
+    deduplicated.set(`${holiday.date}:${holiday.type}`, holiday);
+  }
+
+  return [...deduplicated.values()].sort((a, b) =>
+    `${a.date}:${a.type}`.localeCompare(`${b.date}:${b.type}`)
+  );
 }
 
 function isOfficialKemenkoPmkUrl(url: string): boolean {
@@ -331,15 +349,6 @@ function buildGenericArticleCandidates(year: number): string[] {
     `index.php/pemerintah-tetapkan-hari-libur-nasional-dan-cuti-bersama-tahun-${year}`,
     `index.php/skb-3-menteri-libur-nasional-dan-cuti-bersama-tahun-${year}`
   );
-
-  for (const publicHolidayCount of range(10, 25)) {
-    for (const cutiBersamaCount of range(0, 15)) {
-      slugs.push(
-        `pemerintah-tetapkan-${publicHolidayCount}-hari-libur-nasional-dan-${cutiBersamaCount}-cuti-bersama-tahun-${year}`,
-        `pemerintah-tetapkan-${publicHolidayCount}-hari-libur-nasional-dan-${cutiBersamaCount}-hari-cuti-bersama-tahun-${year}`
-      );
-    }
-  }
 
   return unique(
     slugs.flatMap((slug) =>
@@ -473,6 +482,22 @@ async function fetchHtml(
   }
 }
 
+async function fetchJson(url: string): Promise<unknown | undefined> {
+  try {
+    const response = await axios.get<unknown>(url, {
+      timeout: STRUCTURED_PROVIDER_TIMEOUT_MS,
+      headers: REQUEST_HEADERS,
+      responseType: "json",
+      validateStatus: (status) => status >= 200 && status < 400
+    });
+
+    return response.data;
+  } catch (error) {
+    logger.warn({ url, error }, "Failed to fetch structured holiday source");
+    return undefined;
+  }
+}
+
 async function fetchReaderHtml(url: string): Promise<string | undefined> {
   if (!isOfficialKemenkoPmkUrl(url)) {
     return undefined;
@@ -482,6 +507,183 @@ async function fetchReaderHtml(url: string): Promise<string | undefined> {
     timeoutMs: 15000,
     warnOnFailure: false
   });
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeout: NodeJS.Timeout;
+
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      reject(new HttpError(504, `${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeout);
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function extractArrayPayload(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (!isRecord(payload)) {
+    return [];
+  }
+
+  for (const key of ["data", "holidays", "holiday", "items", "result", "results"]) {
+    const value = payload[key];
+    if (Array.isArray(value)) {
+      return value;
+    }
+  }
+
+  return [];
+}
+
+function getStringField(record: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return undefined;
+}
+
+function getBooleanField(record: Record<string, unknown>, keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "boolean") {
+      return value;
+    }
+
+    if (typeof value === "number") {
+      return value === 1;
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeStructuredHolidays(payload: unknown, year: number): ScrapedHoliday[] {
+  const items = extractArrayPayload(payload);
+  const holidays: ScrapedHoliday[] = [];
+
+  for (const item of items) {
+    if (!isRecord(item)) {
+      continue;
+    }
+
+    const date = getStringField(item, [
+      "date",
+      "tanggal",
+      "holiday_date",
+      "holidayDate",
+      "tgl"
+    ]);
+    const name = getStringField(item, [
+      "name",
+      "description",
+      "keterangan",
+      "holiday_name",
+      "holidayName",
+      "localName",
+      "summary"
+    ]);
+
+    if (!date || !name || !date.startsWith(`${year}-`)) {
+      continue;
+    }
+
+    const isCuti =
+      getBooleanField(item, ["is_cuti", "isCuti", "is_cuti_bersama", "isCutiBersama"]) ??
+      /cuti\s+bersama/i.test(name);
+
+    holidays.push({
+      date,
+      name: normalizeName(name),
+      type: isCuti ? HolidayType.CUTI_BERSAMA : HolidayType.PUBLIC_HOLIDAY
+    });
+  }
+
+  return deduplicateHolidays(holidays);
+}
+
+function hasUsefulHolidayData(holidays: ScrapedHoliday[]): boolean {
+  return (
+    holidays.length >= 5 &&
+    holidays.some((holiday) => holiday.type === HolidayType.PUBLIC_HOLIDAY) &&
+    holidays.some((holiday) => holiday.type === HolidayType.CUTI_BERSAMA)
+  );
+}
+
+async function getStructuredProviderResult(
+  sourceUrl: string,
+  year: number
+): Promise<ProviderResult | undefined> {
+  const payload = await fetchJson(sourceUrl);
+  if (!payload) {
+    return undefined;
+  }
+
+  const holidays = normalizeStructuredHolidays(payload, year);
+  if (!hasUsefulHolidayData(holidays)) {
+    logger.warn(
+      { sourceUrl, parsedCount: holidays.length },
+      "Structured holiday source did not return enough usable records"
+    );
+    return undefined;
+  }
+
+  return {
+    sourceUrl,
+    holidays
+  };
+}
+
+function buildStructuredProviderUrls(year: number): string[] {
+  return [
+    `https://api-hari-libur.vercel.app/api?year=${year}`,
+    `https://holidays-api.newus.id/api?year=${year}`,
+    `https://dayoffapi.vercel.app/api?year=${year}`,
+    `https://api-harilibur.vercel.app/api?year=${year}`,
+    `https://api-harilibur.netlify.app/api?year=${year}`,
+    `https://api-harilibur.pages.dev/api?year=${year}`,
+    `https://libur.deno.dev/api?year=${year}`,
+    `https://date.nager.at/api/v3/PublicHolidays/${year}/ID`
+  ];
+}
+
+async function getStructuredProviderData(year: number): Promise<ProviderResult | undefined> {
+  for (const sourceUrl of buildStructuredProviderUrls(year)) {
+    const result = await getStructuredProviderResult(sourceUrl, year);
+    if (result) {
+      logger.info(
+        {
+          year,
+          sourceUrl: result.sourceUrl,
+          scrapedCount: result.holidays.length,
+          publicHolidays: result.holidays.filter(
+            (holiday) => holiday.type === HolidayType.PUBLIC_HOLIDAY
+          ).length,
+          cutiBersama: result.holidays.filter(
+            (holiday) => holiday.type === HolidayType.CUTI_BERSAMA
+          ).length
+        },
+        "Using structured holiday provider"
+      );
+      return result;
+    }
+  }
+
+  return undefined;
 }
 
 function isValidHolidaySource(html: string, year: number): boolean {
@@ -649,7 +851,29 @@ async function upsertHolidays(holidays: ScrapedHoliday[], year: number): Promise
   return count;
 }
 
-export async function scrapeHolidays(year: number): Promise<ScrapeResult> {
+async function scrapeHolidaysInternal(year: number): Promise<ScrapeResult> {
+  const structuredResult = await getStructuredProviderData(year);
+  if (structuredResult) {
+    const upsertedCount = await upsertHolidays(structuredResult.holidays, year);
+    logger.info(
+      {
+        year,
+        sourceUrl: structuredResult.sourceUrl,
+        scrapedCount: structuredResult.holidays.length,
+        upsertedCount
+      },
+      "Finished holiday scrape"
+    );
+
+    return {
+      year,
+      sourceUrl: structuredResult.sourceUrl,
+      scrapedCount: structuredResult.holidays.length,
+      upsertedCount,
+      holidays: structuredResult.holidays
+    };
+  }
+
   const sourceDocument = await getSourceDocument(year);
   const sourceUrl = sourceDocument.url;
   logger.info({ year, sourceUrl }, "Starting holiday scrape");
@@ -682,4 +906,12 @@ export async function scrapeHolidays(year: number): Promise<ScrapeResult> {
     upsertedCount,
     holidays
   };
+}
+
+export async function scrapeHolidays(year: number): Promise<ScrapeResult> {
+  return withTimeout(
+    scrapeHolidaysInternal(year),
+    SCRAPER_HARD_TIMEOUT_MS,
+    `Holiday scrape for ${year}`
+  );
 }

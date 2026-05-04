@@ -50,5 +50,5 @@ jobs:
         run: npm run db:deploy
 
       - name: Scrape yearly holidays and clean old data
-        timeout-minutes: 7
+        timeout-minutes: 3
         run: npm run scrape:yearly

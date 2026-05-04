@@ -86,7 +86,7 @@ POST /admin/scrape?year=2026
 
 The scraper exposes `scrapeHolidays(year: number)`. It fetches a trusted public page, detects separate sections for `Hari Libur Nasional` and `Cuti Bersama`, normalizes dates to `YYYY-MM-DD`, and upserts records using the unique `(date, type)` constraint.
 
-The scraper discovers official Kemenko PMK source pages at runtime for the requested year. It searches official Kemenko PMK pages, extracts candidate links mentioning `libur nasional`, `cuti bersama`, and the requested year, then accepts a source only after it can parse both `PUBLIC_HOLIDAY` and `CUTI_BERSAMA` records from the page. `SCRAPER_SOURCE_URL_TEMPLATE` remains available as an optional fallback.
+The scraper uses a provider chain. It tries fast structured public JSON sources first, then falls back to web/source discovery and HTML scraping. Records are normalized into the local `Holiday` model, with names containing `Cuti Bersama` classified as `CUTI_BERSAMA` and the rest as `PUBLIC_HOLIDAY`. The scrape has a hard timeout so automation does not hang indefinitely.
 
 ## Yearly Automation
 
