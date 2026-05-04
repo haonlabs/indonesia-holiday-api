@@ -21,9 +21,6 @@
     },
     {
       "name": "Holidays"
-    },
-    {
-      "name": "Admin"
     }
   ],
   "paths": {
@@ -109,61 +106,6 @@
           }
         }
       }
-    },
-    "/admin/scrape": {
-      "post": {
-        "tags": ["Admin"],
-        "summary": "Trigger holiday scraper",
-        "description": "Runs the scraper for a requested year, upserts the result into the database, and returns the inserted/updated count.",
-        "parameters": [
-          {
-            "name": "year",
-            "in": "query",
-            "required": true,
-            "description": "Holiday year to scrape.",
-            "schema": {
-              "type": "integer",
-              "example": 2026,
-              "minimum": 1900,
-              "maximum": 2200
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Scrape completed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ScrapeResponse"
-                },
-                "example": {
-                  "year": 2026,
-                  "sourceUrl": "https://api-hari-libur.vercel.app/api?year=2026",
-                  "scrapedCount": 23,
-                  "upsertedCount": 23
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/ValidationError"
-          },
-          "422": {
-            "description": "Source could not be parsed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalServerError"
-          }
-        }
-      }
     }
   },
   "components": {
@@ -214,28 +156,6 @@
           "status": {
             "type": "string",
             "example": "ok"
-          }
-        }
-      },
-      "ScrapeResponse": {
-        "type": "object",
-        "required": ["year", "sourceUrl", "scrapedCount", "upsertedCount"],
-        "properties": {
-          "year": {
-            "type": "integer",
-            "example": 2026
-          },
-          "sourceUrl": {
-            "type": "string",
-            "format": "uri"
-          },
-          "scrapedCount": {
-            "type": "integer",
-            "example": 23
-          },
-          "upsertedCount": {
-            "type": "integer",
-            "example": 23
           }
         }
       },
