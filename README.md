@@ -29,6 +29,7 @@ Required environment variables:
 ```text
 NODE_ENV=production
 DATABASE_URL=<your Supabase session pooler URL on port 5432>
+DIRECT_URL=<your Supabase session pooler URL on port 5432, used by Prisma migrations>
 ```
 
 Do not run `prisma db push` in Render's build command. Builds should compile the app; migrations should run as a pre-deploy step or manually with `npm run db:deploy`.
@@ -102,7 +103,8 @@ The GitHub Actions workflow at `.github/workflows/yearly-holiday-maintenance.yml
 Add these GitHub repository secrets:
 
 ```text
-DATABASE_URL=<your Supabase session pooler URL>
+DATABASE_URL=<your Supabase runtime URL>
+DIRECT_URL=<your Supabase session pooler URL on port 5432, used by Prisma migrations>
 SCRAPER_SOURCE_URL_TEMPLATE=<optional fallback URL template containing {year}>
 ```
 

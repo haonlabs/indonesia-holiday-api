@@ -24,6 +24,7 @@ jobs:
 
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
       SCRAPER_SOURCE_URL_TEMPLATE: ${{ secrets.SCRAPER_SOURCE_URL_TEMPLATE }}
       SCRAPE_YEAR: ${{ github.event_name == 'workflow_dispatch' && inputs.year || '' }}
       RETENTION_YEARS: ${{ github.event_name == 'workflow_dispatch' && inputs.retention_years || '5' }}
