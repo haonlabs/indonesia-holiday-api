@@ -2,10 +2,10 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
+import { logger } from "./lib/logger";
+import { errorMiddleware } from "./middleware/error.middleware";
 import { adminRouter } from "./routes/admin.routes";
 import { holidayRouter } from "./routes/holiday.routes";
-import { errorMiddleware } from "./middleware/error.middleware";
-import { logger } from "./lib/logger";
 
 export const app = express();
 
@@ -14,8 +14,8 @@ app.use(cors());
 app.use(express.json());
 app.use(
   pinoHttp({
-    logger
-  })
+    logger,
+  }),
 );
 
 app.get("/health", (_req, res) => {
