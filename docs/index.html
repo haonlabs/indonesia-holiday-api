@@ -4,72 +4,376 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Indonesia Holiday API Docs</title>
+    <meta
+      name="description"
+      content="REST API documentation for Indonesian public holidays and cuti bersama."
+    />
     <link
       rel="stylesheet"
       href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"
     />
     <style>
+      :root {
+        color-scheme: light;
+        --ink: #172033;
+        --muted: #5b6575;
+        --line: #d9dee7;
+        --soft: #f5f7fb;
+        --brand: #0f766e;
+        --brand-strong: #115e59;
+        --accent: #f59e0b;
+        --code: #101827;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
       body {
         margin: 0;
-        background: #f7f7f8;
-        color: #1f2937;
+        background: #ffffff;
+        color: var(--ink);
         font-family:
           Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
           "Segoe UI", sans-serif;
+      }
+
+      a {
+        color: var(--brand);
+      }
+
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 14px clamp(18px, 4vw, 48px);
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.94);
+        backdrop-filter: blur(10px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--ink);
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        border-radius: 6px;
+        background: var(--brand);
+        color: #ffffff;
+        font-weight: 900;
+      }
+
+      .nav-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        justify-content: flex-end;
+      }
+
+      .nav-links a {
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .hero {
+        padding: 72px clamp(18px, 5vw, 72px) 36px;
+        background:
+          linear-gradient(135deg, rgba(15, 118, 110, 0.1), transparent 48%),
+          linear-gradient(180deg, #ffffff, #f8fafc);
+      }
+
+      .hero-inner {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+        gap: 36px;
+        max-width: 1180px;
+        margin: 0 auto;
+        align-items: center;
+      }
+
+      h1 {
+        max-width: 760px;
+        margin: 0;
+        color: var(--ink);
+        font-size: clamp(38px, 6vw, 72px);
+        line-height: 0.98;
+        letter-spacing: 0;
+      }
+
+      .lead {
+        max-width: 720px;
+        margin: 22px 0 0;
+        color: var(--muted);
+        font-size: clamp(17px, 2vw, 21px);
+        line-height: 1.65;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 30px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0 16px;
+        border: 1px solid var(--brand);
+        border-radius: 6px;
+        background: var(--brand);
+        color: #ffffff;
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      .button.secondary {
+        background: #ffffff;
+        color: var(--brand-strong);
+      }
+
+      .status-panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
+        overflow: hidden;
+      }
+
+      .status-panel header {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .status-row {
+        display: grid;
+        grid-template-columns: 130px 1fr;
+        gap: 12px;
+        padding: 13px 16px;
+        border-bottom: 1px solid var(--line);
+        font-size: 14px;
+      }
+
+      .status-row:last-child {
+        border-bottom: 0;
+      }
+
+      .status-row span:first-child {
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .status-row code {
+        color: var(--brand-strong);
+        font-weight: 800;
+        overflow-wrap: anywhere;
+      }
+
+      .section {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 56px clamp(18px, 4vw, 36px);
+      }
+
+      .section h2 {
+        margin: 0 0 14px;
+        font-size: clamp(28px, 4vw, 42px);
+        line-height: 1.1;
+        letter-spacing: 0;
+      }
+
+      .section-intro {
+        max-width: 760px;
+        margin: 0 0 28px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.7;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .card {
+        min-height: 150px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .endpoint-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .endpoint {
+        display: grid;
+        grid-template-columns: 96px 1fr;
+        gap: 14px;
+        align-items: start;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+      }
+
+      .method {
+        display: inline-flex;
+        justify-content: center;
+        padding: 6px 8px;
+        border-radius: 6px;
+        background: var(--brand);
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .method.post {
+        background: var(--accent);
+        color: #2f1e00;
+      }
+
+      .endpoint code {
+        display: block;
+        color: var(--code);
+        font-weight: 800;
+        overflow-wrap: anywhere;
+      }
+
+      .endpoint p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      pre {
+        margin: 0;
+        padding: 18px;
+        border-radius: 8px;
+        overflow: auto;
+        background: var(--code);
+        color: #d1fae5;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .swagger-shell {
+        border-top: 1px solid var(--line);
+        background: #f7f7f8;
       }
 
       .topbar {
         display: flex;
         gap: 12px;
         align-items: center;
-        padding: 14px 18px;
-        background: #111827;
-        color: #ffffff;
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 16px clamp(18px, 4vw, 36px);
+        color: var(--ink);
       }
 
       .topbar label {
         font-size: 14px;
-        font-weight: 600;
+        font-weight: 800;
         white-space: nowrap;
       }
 
       .topbar input {
         flex: 1;
         min-width: 180px;
-        height: 36px;
+        height: 38px;
         padding: 0 10px;
-        border: 1px solid #4b5563;
+        border: 1px solid var(--line);
         border-radius: 6px;
         background: #ffffff;
-        color: #111827;
+        color: var(--ink);
         font-size: 14px;
       }
 
       .topbar button {
-        height: 36px;
+        height: 38px;
         padding: 0 14px;
         border: 0;
         border-radius: 6px;
-        background: #10b981;
-        color: #06281e;
-        font-weight: 700;
+        background: var(--brand);
+        color: #ffffff;
+        font-weight: 800;
         cursor: pointer;
       }
 
       .hint {
-        padding: 10px 18px;
-        background: #ecfeff;
-        border-bottom: 1px solid #cffafe;
-        color: #155e75;
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 0 clamp(18px, 4vw, 36px) 16px;
+        color: var(--muted);
         font-size: 14px;
+        line-height: 1.6;
       }
 
       #swagger-ui {
         max-width: 1280px;
         margin: 0 auto;
+        padding-bottom: 36px;
+      }
+
+      @media (max-width: 860px) {
+        .hero-inner,
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .endpoint {
+          grid-template-columns: 1fr;
+        }
       }
 
       @media (max-width: 720px) {
+        .nav {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
         .topbar {
           align-items: stretch;
           flex-direction: column;
@@ -78,20 +382,196 @@
     </style>
   </head>
   <body>
-    <div class="topbar">
-      <label for="server-url">API base URL</label>
-      <input
-        id="server-url"
-        type="url"
-        placeholder="https://indonesia-holiday-api.onrender.com"
-      />
-      <button id="apply-server" type="button">Apply</button>
-    </div>
-    <div class="hint">
-      Enter your deployed API URL, then use Swagger's Try it out buttons to send
-      real requests. The API must be deployed over HTTPS and allow CORS.
-    </div>
-    <div id="swagger-ui"></div>
+    <nav class="nav" aria-label="Primary navigation">
+      <a class="brand" href="#top">
+        <span class="brand-mark">ID</span>
+        <span>Indonesia Holiday API</span>
+      </a>
+      <div class="nav-links">
+        <a href="#quick-start">Quick Start</a>
+        <a href="#endpoints">Endpoints</a>
+        <a href="#response">Response</a>
+        <a href="#swagger">Swagger</a>
+      </div>
+    </nav>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-inner">
+          <div>
+            <h1>Indonesian holidays and cuti bersama, served as JSON.</h1>
+            <p class="lead">
+              Query Hari Libur Nasional and Cuti Bersama by year or type. Built
+              with Express, Prisma, PostgreSQL, and an automated provider chain
+              that keeps data fresh.
+            </p>
+            <div class="actions">
+              <a class="button" href="#swagger">Try the API</a>
+              <a
+                class="button secondary"
+                href="https://indonesia-holiday-api.onrender.com/holidays?year=2026"
+                >View 2026 Data</a
+              >
+            </div>
+          </div>
+
+          <aside class="status-panel" aria-label="API summary">
+            <header>
+              <span>Live API</span>
+              <span>HTTPS + CORS</span>
+            </header>
+            <div class="status-row">
+              <span>Base URL</span>
+              <code>https://indonesia-holiday-api.onrender.com</code>
+            </div>
+            <div class="status-row">
+              <span>Data Types</span>
+              <code>PUBLIC_HOLIDAY, CUTI_BERSAMA</code>
+            </div>
+            <div class="status-row">
+              <span>Storage</span>
+              <code>PostgreSQL via Prisma</code>
+            </div>
+            <div class="status-row">
+              <span>Automation</span>
+              <code>GitHub Actions yearly scrape</code>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section" id="quick-start">
+        <h2>Quick Start</h2>
+        <p class="section-intro">
+          The public read endpoints need no API key. Use the deployed base URL
+          below, or replace it with your own deployment.
+        </p>
+        <pre><code>curl "https://indonesia-holiday-api.onrender.com/holidays?year=2026"
+
+curl "https://indonesia-holiday-api.onrender.com/holidays?type=CUTI_BERSAMA"
+
+curl "https://indonesia-holiday-api.onrender.com/health"</code></pre>
+      </section>
+
+      <section class="section">
+        <h2>What You Get</h2>
+        <p class="section-intro">
+          The API returns normalized holiday rows designed for calendars,
+          scheduling tools, HR systems, and internal business apps.
+        </p>
+        <div class="grid">
+          <article class="card">
+            <h3>Normalized Dates</h3>
+            <p>
+              Every holiday uses ISO date format, so clients can sort, filter,
+              and display records without extra parsing.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Explicit Types</h3>
+            <p>
+              Records are classified as either national public holidays or cuti
+              bersama using a stable enum.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Automated Updates</h3>
+            <p>
+              A yearly GitHub Actions workflow refreshes holiday data and removes
+              records older than the retention window.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="endpoints">
+        <h2>Endpoints</h2>
+        <p class="section-intro">
+          These are the primary routes exposed by the API. Use the Swagger tester
+          below for interactive requests.
+        </p>
+        <div class="endpoint-list">
+          <article class="endpoint">
+            <span class="method">GET</span>
+            <div>
+              <code>/health</code>
+              <p>Returns a simple health-check response.</p>
+            </div>
+          </article>
+          <article class="endpoint">
+            <span class="method">GET</span>
+            <div>
+              <code>/holidays</code>
+              <p>Returns all stored holidays, sorted by date and type.</p>
+            </div>
+          </article>
+          <article class="endpoint">
+            <span class="method">GET</span>
+            <div>
+              <code>/holidays?year=2026</code>
+              <p>Filters holiday data to a specific year.</p>
+            </div>
+          </article>
+          <article class="endpoint">
+            <span class="method">GET</span>
+            <div>
+              <code>/holidays?type=CUTI_BERSAMA</code>
+              <p>Filters by holiday type. Accepted values are <code>PUBLIC_HOLIDAY</code> and <code>CUTI_BERSAMA</code>.</p>
+            </div>
+          </article>
+          <article class="endpoint">
+            <span class="method post">POST</span>
+            <div>
+              <code>/admin/scrape?year=2026</code>
+              <p>Triggers scraper ingestion for a year and upserts the data into PostgreSQL.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="response">
+        <h2>Response Shape</h2>
+        <p class="section-intro">
+          Holiday responses include the database ID, normalized date, display
+          name, enum type, year, and timestamps.
+        </p>
+        <pre><code>[
+  {
+    "id": "4ab81aa3-2b20-4c7d-b2ea-60236c133f50",
+    "date": "2026-01-01",
+    "name": "Tahun Baru 2026 Masehi",
+    "type": "PUBLIC_HOLIDAY",
+    "year": 2026,
+    "createdAt": "2026-05-04T02:00:00.000Z",
+    "updatedAt": "2026-05-04T02:00:00.000Z"
+  }
+]</code></pre>
+      </section>
+
+      <section class="swagger-shell" id="swagger">
+        <div class="section">
+          <h2>Interactive Swagger</h2>
+          <p class="section-intro">
+            Test the live API from this page. The selected server is stored in
+            your browser, so you can point the tester at your own deployment.
+          </p>
+        </div>
+        <div class="topbar">
+          <label for="server-url">API base URL</label>
+          <input
+            id="server-url"
+            type="url"
+            placeholder="https://indonesia-holiday-api.onrender.com"
+          />
+          <button id="apply-server" type="button">Apply</button>
+        </div>
+        <div class="hint">
+          Use an HTTPS API URL with CORS enabled. The production Render URL is
+          already included in the OpenAPI server list.
+        </div>
+        <div id="swagger-ui"></div>
+      </section>
+    </main>
 
     <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
     <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
