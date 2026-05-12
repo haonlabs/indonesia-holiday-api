@@ -1,6 +1,6 @@
+import { HolidayType } from "@prisma/client";
 import axios from "axios";
 import * as cheerio from "cheerio";
-import { HolidayType } from "@prisma/client";
 import { env } from "../config/env";
 import { logger } from "../lib/logger";
 import { prisma } from "../lib/prisma";
@@ -49,7 +49,7 @@ const MONTHS: Record<string, number> = {
   september: 9,
   oktober: 10,
   november: 11,
-  desember: 12
+  desember: 12,
 };
 
 const WEEKDAYS =
@@ -58,14 +58,15 @@ const WEEKDAYS =
 const OFFICIAL_BASE_URLS = [
   "https://www.kemenkopmk.go.id",
   "https://kemenkopmk.go.id",
-  "https://www2.kemenkopmk.go.id"
+  "https://www2.kemenkopmk.go.id",
 ];
 
 const REQUEST_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (compatible; indonesia-holiday-api/1.0; +https://github.com/example/indonesia-holiday-api)",
-  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7",
-  "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.7,en;q=0.6"
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7",
+  "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.7,en;q=0.6",
 };
 
 const SCRAPER_HARD_TIMEOUT_MS = 90_000;
@@ -108,7 +109,9 @@ function expandDays(raw: string): number[] {
 
   const days: number[] = [];
   for (const match of normalized.matchAll(/\d{1,2}(?:\s*-\s*\d{1,2})?/g)) {
-    const [start, end] = match[0].split("-").map((value) => Number(value.trim()));
+    const [start, end] = match[0]
+      .split("-")
+      .map((value) => Number(value.trim()));
     if (end && end >= start) {
       for (let day = start; day <= end; day += 1) {
         days.push(day);
@@ -123,7 +126,10 @@ function expandDays(raw: string): number[] {
 
 function extractDateParts(line: string, year: number): string[] {
   const dates: string[] = [];
-  const monthPattern = new RegExp(`\\b(${Object.keys(MONTHS).join("|")})\\b`, "gi");
+  const monthPattern = new RegExp(
+    `\\b(${Object.keys(MONTHS).join("|")})\\b`,
+    "gi",
+  );
 
   for (const match of line.matchAll(monthPattern)) {
     const monthName = match[1].toLowerCase();
@@ -161,18 +167,18 @@ function extractName(line: string): string {
       .replace(
         new RegExp(
           `\\b\\d{1,2}(?:\\s*(?:,|-|dan|serta)\\s*\\d{1,2})*\\s*(${Object.keys(MONTHS).join("|")})\\b`,
-          "gi"
+          "gi",
         ),
-        ""
+        "",
       )
-      .replace(/\b\d{4}\b/g, "")
+      .replace(/\b\d{4}\b/g, ""),
   );
 }
 
 function parseHolidayLine(
   line: string,
   fallbackType: HolidayType,
-  year: number
+  year: number,
 ): ScrapedHoliday[] {
   const normalizedLine = compactText(line);
   if (!normalizedLine || !/\d{1,2}/.test(normalizedLine)) {
@@ -192,7 +198,7 @@ function parseHolidayLine(
   return dates.map((date) => ({
     date,
     name,
-    type
+    type,
   }));
 }
 
@@ -232,7 +238,10 @@ export function parseHolidayHtml(html: string, year: number): ScrapedHoliday[] {
   const lines = extractLines(html);
   let currentType: HolidayType = HolidayType.PUBLIC_HOLIDAY;
   const holidays: ScrapedHoliday[] = [];
-  const monthPattern = new RegExp(`\\b(${Object.keys(MONTHS).join("|")})\\b`, "i");
+  const monthPattern = new RegExp(
+    `\\b(${Object.keys(MONTHS).join("|")})\\b`,
+    "i",
+  );
 
   for (const line of lines) {
     const isSectionHeading = !monthPattern.test(line);
@@ -273,14 +282,16 @@ function deduplicateHolidays(holidays: ScrapedHoliday[]): ScrapedHoliday[] {
   }
 
   return [...deduplicated.values()].sort((a, b) =>
-    `${a.date}:${a.type}`.localeCompare(`${b.date}:${b.type}`)
+    `${a.date}:${a.type}`.localeCompare(`${b.date}:${b.type}`),
   );
 }
 
 function isOfficialKemenkoPmkUrl(url: string): boolean {
   try {
     const hostname = new URL(url).hostname;
-    return hostname === "kemenkopmk.go.id" || hostname.endsWith(".kemenkopmk.go.id");
+    return (
+      hostname === "kemenkopmk.go.id" || hostname.endsWith(".kemenkopmk.go.id")
+    );
   } catch {
     return false;
   }
@@ -288,10 +299,9 @@ function isOfficialKemenkoPmkUrl(url: string): boolean {
 
 function buildDiscoveryUrls(year: number): string[] {
   const query = encodeURIComponent(`libur nasional cuti bersama tahun ${year}`);
-  const pathQuery = encodeURIComponent(`libur nasional cuti bersama ${year}`).replace(
-    /%20/g,
-    "+"
-  );
+  const pathQuery = encodeURIComponent(
+    `libur nasional cuti bersama ${year}`,
+  ).replace(/%20/g, "+");
 
   return unique(
     OFFICIAL_BASE_URLS.flatMap((baseUrl) => [
@@ -302,25 +312,28 @@ function buildDiscoveryUrls(year: number): string[] {
       `${baseUrl}/search?search=${query}`,
       `${baseUrl}/search/node?keys=${query}`,
       `${baseUrl}/search/node/${pathQuery}`,
-      `${baseUrl}/index.php/search/node/${pathQuery}`
-    ])
+      `${baseUrl}/index.php/search/node/${pathQuery}`,
+    ]),
   );
 }
 
 function buildSearchDiscoveryUrls(year: number): string[] {
   const query = encodeURIComponent(
-    `site:kemenkopmk.go.id libur nasional cuti bersama tahun ${year}`
+    `site:kemenkopmk.go.id libur nasional cuti bersama tahun ${year}`,
   );
 
   return [
     `https://s.jina.ai/${query}`,
     `https://duckduckgo.com/html/?q=${query}`,
-    `https://www.bing.com/search?q=${query}`
+    `https://www.bing.com/search?q=${query}`,
   ];
 }
 
 function range(start: number, end: number): number[] {
-  return Array.from({ length: end - start + 1 }, (_value, index) => start + index);
+  return Array.from(
+    { length: end - start + 1 },
+    (_value, index) => start + index,
+  );
 }
 
 function buildGenericArticleCandidates(year: number): string[] {
@@ -333,13 +346,13 @@ function buildGenericArticleCandidates(year: number): string[] {
     [15, 4],
     [15, 5],
     [14, 4],
-    [14, 5]
+    [14, 5],
   ];
 
   for (const [publicHolidayCount, cutiBersamaCount] of likelyCounts) {
     slugs.push(
       `pemerintah-tetapkan-${publicHolidayCount}-hari-libur-nasional-dan-${cutiBersamaCount}-cuti-bersama-tahun-${year}`,
-      `pemerintah-tetapkan-${publicHolidayCount}-hari-libur-nasional-dan-${cutiBersamaCount}-hari-cuti-bersama-tahun-${year}`
+      `pemerintah-tetapkan-${publicHolidayCount}-hari-libur-nasional-dan-${cutiBersamaCount}-hari-cuti-bersama-tahun-${year}`,
     );
   }
 
@@ -347,17 +360,20 @@ function buildGenericArticleCandidates(year: number): string[] {
     `pemerintah-tetapkan-hari-libur-nasional-dan-cuti-bersama-tahun-${year}`,
     `skb-3-menteri-libur-nasional-dan-cuti-bersama-tahun-${year}`,
     `index.php/pemerintah-tetapkan-hari-libur-nasional-dan-cuti-bersama-tahun-${year}`,
-    `index.php/skb-3-menteri-libur-nasional-dan-cuti-bersama-tahun-${year}`
+    `index.php/skb-3-menteri-libur-nasional-dan-cuti-bersama-tahun-${year}`,
   );
 
   return unique(
     slugs.flatMap((slug) =>
-      OFFICIAL_BASE_URLS.map((baseUrl) => `${baseUrl}/${slug}`)
-    )
+      OFFICIAL_BASE_URLS.map((baseUrl) => `${baseUrl}/${slug}`),
+    ),
   );
 }
 
-function resolveCandidateUrl(href: string, sourceUrl: string): string | undefined {
+function resolveCandidateUrl(
+  href: string,
+  sourceUrl: string,
+): string | undefined {
   try {
     const url = new URL(href, sourceUrl);
 
@@ -376,7 +392,11 @@ function resolveCandidateUrl(href: string, sourceUrl: string): string | undefine
   }
 }
 
-function extractCandidateUrls(html: string, sourceUrl: string, year: number): string[] {
+function extractCandidateUrls(
+  html: string,
+  sourceUrl: string,
+  year: number,
+): string[] {
   const $ = cheerio.load(html);
   const candidates: string[] = [];
 
@@ -422,7 +442,10 @@ function extractCandidateUrls(html: string, sourceUrl: string, year: number): st
     /https?:\/\/(?:www\d?\.)?kemenkopmk\.go\.id\/[^\s"'<>)]*libur[^\s"'<>)]*cuti[^\s"'<>)]*/gi;
   for (const match of html.matchAll(officialUrlPattern)) {
     const candidateUrl = match[0].replace(/[.,;]+$/g, "");
-    if (candidateUrl.includes(String(year)) && isOfficialKemenkoPmkUrl(candidateUrl)) {
+    if (
+      candidateUrl.includes(String(year)) &&
+      isOfficialKemenkoPmkUrl(candidateUrl)
+    ) {
       candidates.push(candidateUrl.split("#")[0]);
     }
   }
@@ -442,7 +465,7 @@ function isUnavailableOriginError(error: unknown): boolean {
   return (
     axios.isAxiosError(error) &&
     ["ECONNABORTED", "ENOTFOUND", "ETIMEDOUT", "ECONNRESET"].includes(
-      String(error.code)
+      String(error.code),
     ) &&
     !error.response
   );
@@ -450,7 +473,7 @@ function isUnavailableOriginError(error: unknown): boolean {
 
 async function fetchHtml(
   url: string,
-  options: FetchHtmlOptions = {}
+  options: FetchHtmlOptions = {},
 ): Promise<string | undefined> {
   const origin = getOrigin(url);
   if (origin && options.unavailableOrigins?.has(origin)) {
@@ -462,7 +485,7 @@ async function fetchHtml(
       timeout: options.timeoutMs ?? 15000,
       headers: REQUEST_HEADERS,
       responseType: "text",
-      validateStatus: (status) => status >= 200 && status < 400
+      validateStatus: (status) => status >= 200 && status < 400,
     });
 
     return response.data;
@@ -477,7 +500,11 @@ async function fetchHtml(
     }
 
     const log = options.warnOnFailure === false ? logger.debug : logger.warn;
-    log.call(logger, { url, error }, "Failed to fetch candidate holiday source");
+    log.call(
+      logger,
+      { url, error },
+      "Failed to fetch candidate holiday source",
+    );
     return undefined;
   }
 }
@@ -488,7 +515,7 @@ async function fetchJson(url: string): Promise<unknown | undefined> {
       timeout: STRUCTURED_PROVIDER_TIMEOUT_MS,
       headers: REQUEST_HEADERS,
       responseType: "json",
-      validateStatus: (status) => status >= 200 && status < 400
+      validateStatus: (status) => status >= 200 && status < 400,
     });
 
     return response.data;
@@ -505,11 +532,15 @@ async function fetchReaderHtml(url: string): Promise<string | undefined> {
 
   return fetchHtml(`https://r.jina.ai/${url}`, {
     timeoutMs: 15000,
-    warnOnFailure: false
+    warnOnFailure: false,
   });
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
   let timeout: NodeJS.Timeout;
 
   const timeoutPromise = new Promise<never>((_resolve, reject) => {
@@ -536,7 +567,14 @@ function extractArrayPayload(payload: unknown): unknown[] {
     return [];
   }
 
-  for (const key of ["data", "holidays", "holiday", "items", "result", "results"]) {
+  for (const key of [
+    "data",
+    "holidays",
+    "holiday",
+    "items",
+    "result",
+    "results",
+  ]) {
     const value = payload[key];
     if (Array.isArray(value)) {
       return value;
@@ -546,7 +584,10 @@ function extractArrayPayload(payload: unknown): unknown[] {
   return [];
 }
 
-function getStringField(record: Record<string, unknown>, keys: string[]): string | undefined {
+function getStringField(
+  record: Record<string, unknown>,
+  keys: string[],
+): string | undefined {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "string" && value.trim()) {
@@ -557,7 +598,10 @@ function getStringField(record: Record<string, unknown>, keys: string[]): string
   return undefined;
 }
 
-function getBooleanField(record: Record<string, unknown>, keys: string[]): boolean | undefined {
+function getBooleanField(
+  record: Record<string, unknown>,
+  keys: string[],
+): boolean | undefined {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "boolean") {
@@ -572,7 +616,10 @@ function getBooleanField(record: Record<string, unknown>, keys: string[]): boole
   return undefined;
 }
 
-function normalizeStructuredHolidays(payload: unknown, year: number): ScrapedHoliday[] {
+function normalizeStructuredHolidays(
+  payload: unknown,
+  year: number,
+): ScrapedHoliday[] {
   const items = extractArrayPayload(payload);
   const holidays: ScrapedHoliday[] = [];
 
@@ -586,7 +633,7 @@ function normalizeStructuredHolidays(payload: unknown, year: number): ScrapedHol
       "tanggal",
       "holiday_date",
       "holidayDate",
-      "tgl"
+      "tgl",
     ]);
     const name = getStringField(item, [
       "name",
@@ -595,7 +642,7 @@ function normalizeStructuredHolidays(payload: unknown, year: number): ScrapedHol
       "holiday_name",
       "holidayName",
       "localName",
-      "summary"
+      "summary",
     ]);
 
     if (!date || !name || !date.startsWith(`${year}-`)) {
@@ -603,13 +650,29 @@ function normalizeStructuredHolidays(payload: unknown, year: number): ScrapedHol
     }
 
     const isCuti =
-      getBooleanField(item, ["is_cuti", "isCuti", "is_cuti_bersama", "isCutiBersama"]) ??
-      /cuti\s+bersama/i.test(name);
+      getBooleanField(item, [
+        "is_cuti",
+        "isCuti",
+        "is_cuti_bersama",
+        "isCutiBersama",
+      ]) ?? /cuti\s+bersama/i.test(name);
+
+    const isNationalHoliday = getBooleanField(item, [
+      "is_national_holiday",
+      "isNationalHoliday",
+    ]);
+
+    let type: HolidayType;
+    if (isNationalHoliday !== undefined) {
+      type = isNationalHoliday ? HolidayType.PUBLIC_HOLIDAY : HolidayType.CUTI_BERSAMA;
+    } else {
+      type = isCuti ? HolidayType.CUTI_BERSAMA : HolidayType.PUBLIC_HOLIDAY;
+    }
 
     holidays.push({
       date,
       name: normalizeName(name),
-      type: isCuti ? HolidayType.CUTI_BERSAMA : HolidayType.PUBLIC_HOLIDAY
+      type,
     });
   }
 
@@ -626,7 +689,7 @@ function hasUsefulHolidayData(holidays: ScrapedHoliday[]): boolean {
 
 async function getStructuredProviderResult(
   sourceUrl: string,
-  year: number
+  year: number,
 ): Promise<ProviderResult | undefined> {
   const payload = await fetchJson(sourceUrl);
   if (!payload) {
@@ -637,31 +700,27 @@ async function getStructuredProviderResult(
   if (!hasUsefulHolidayData(holidays)) {
     logger.warn(
       { sourceUrl, parsedCount: holidays.length },
-      "Structured holiday source did not return enough usable records"
+      "Structured holiday source did not return enough usable records",
     );
     return undefined;
   }
 
   return {
     sourceUrl,
-    holidays
+    holidays,
   };
 }
 
 function buildStructuredProviderUrls(year: number): string[] {
   return [
-    `https://api-hari-libur.vercel.app/api?year=${year}`,
-    `https://holidays-api.newus.id/api?year=${year}`,
-    `https://dayoffapi.vercel.app/api?year=${year}`,
-    `https://api-harilibur.vercel.app/api?year=${year}`,
-    `https://api-harilibur.netlify.app/api?year=${year}`,
-    `https://api-harilibur.pages.dev/api?year=${year}`,
     `https://libur.deno.dev/api?year=${year}`,
-    `https://date.nager.at/api/v3/PublicHolidays/${year}/ID`
+    `https://date.nager.at/api/v3/PublicHolidays/${year}/ID`,
   ];
 }
 
-async function getStructuredProviderData(year: number): Promise<ProviderResult | undefined> {
+async function getStructuredProviderData(
+  year: number,
+): Promise<ProviderResult | undefined> {
   for (const sourceUrl of buildStructuredProviderUrls(year)) {
     const result = await getStructuredProviderResult(sourceUrl, year);
     if (result) {
@@ -671,13 +730,13 @@ async function getStructuredProviderData(year: number): Promise<ProviderResult |
           sourceUrl: result.sourceUrl,
           scrapedCount: result.holidays.length,
           publicHolidays: result.holidays.filter(
-            (holiday) => holiday.type === HolidayType.PUBLIC_HOLIDAY
+            (holiday) => holiday.type === HolidayType.PUBLIC_HOLIDAY,
           ).length,
           cutiBersama: result.holidays.filter(
-            (holiday) => holiday.type === HolidayType.CUTI_BERSAMA
-          ).length
+            (holiday) => holiday.type === HolidayType.CUTI_BERSAMA,
+          ).length,
         },
-        "Using structured holiday provider"
+        "Using structured holiday provider",
       );
       return result;
     }
@@ -696,7 +755,7 @@ function isValidHolidaySource(html: string, year: number): boolean {
 
 async function findFirstValidCandidate(
   candidateUrls: Iterable<string>,
-  year: number
+  year: number,
 ): Promise<SourceDocument | undefined> {
   const urls = unique([...candidateUrls]);
   let currentIndex = 0;
@@ -711,12 +770,12 @@ async function findFirstValidCandidate(
       const html = await fetchHtml(candidateUrl, {
         timeoutMs: 3000,
         unavailableOrigins,
-        warnOnFailure: false
+        warnOnFailure: false,
       });
       if (html && isValidHolidaySource(html, year)) {
         sourceDocument = {
           url: candidateUrl,
-          html
+          html,
         };
         continue;
       }
@@ -725,7 +784,7 @@ async function findFirstValidCandidate(
       if (readerHtml && isValidHolidaySource(readerHtml, year)) {
         sourceDocument = {
           url: candidateUrl,
-          html: readerHtml
+          html: readerHtml,
         };
       }
     }
@@ -735,7 +794,9 @@ async function findFirstValidCandidate(
   return sourceDocument;
 }
 
-async function discoverOfficialSourceDocument(year: number): Promise<SourceDocument | undefined> {
+async function discoverOfficialSourceDocument(
+  year: number,
+): Promise<SourceDocument | undefined> {
   logger.info({ year }, "Discovering official holiday source");
 
   const candidateUrls = new Set<string>(buildGenericArticleCandidates(year));
@@ -743,7 +804,7 @@ async function discoverOfficialSourceDocument(year: number): Promise<SourceDocum
   if (directCandidate) {
     logger.info(
       { year, sourceUrl: directCandidate.url },
-      "Discovered official holiday source"
+      "Discovered official holiday source",
     );
     return directCandidate;
   }
@@ -752,7 +813,7 @@ async function discoverOfficialSourceDocument(year: number): Promise<SourceDocum
   for (const discoveryUrl of buildSearchDiscoveryUrls(year)) {
     const html = await fetchHtml(discoveryUrl, {
       timeoutMs: 10000,
-      warnOnFailure: false
+      warnOnFailure: false,
     });
     if (!html) {
       continue;
@@ -763,11 +824,14 @@ async function discoverOfficialSourceDocument(year: number): Promise<SourceDocum
     }
   }
 
-  const searchCandidate = await findFirstValidCandidate(searchCandidateUrls, year);
+  const searchCandidate = await findFirstValidCandidate(
+    searchCandidateUrls,
+    year,
+  );
   if (searchCandidate) {
     logger.info(
       { year, sourceUrl: searchCandidate.url },
-      "Discovered official holiday source"
+      "Discovered official holiday source",
     );
     return searchCandidate;
   }
@@ -776,7 +840,7 @@ async function discoverOfficialSourceDocument(year: number): Promise<SourceDocum
   for (const discoveryUrl of buildDiscoveryUrls(year)) {
     const html = await fetchHtml(discoveryUrl, {
       timeoutMs: 5000,
-      unavailableOrigins: unavailableDiscoveryOrigins
+      unavailableOrigins: unavailableDiscoveryOrigins,
     });
     if (!html) {
       continue;
@@ -795,7 +859,7 @@ async function discoverOfficialSourceDocument(year: number): Promise<SourceDocum
   if (discoveredSource) {
     logger.info(
       { year, sourceUrl: discoveredSource.url },
-      "Discovered official holiday source"
+      "Discovered official holiday source",
     );
     return discoveredSource;
   }
@@ -819,11 +883,14 @@ async function getSourceDocument(year: number): Promise<SourceDocument> {
 
   throw new HttpError(
     400,
-    `Could not discover an official holiday source for ${year}. The government may not have published it yet.`
+    `Could not discover an official holiday source for ${year}. The government may not have published it yet.`,
   );
 }
 
-async function upsertHolidays(holidays: ScrapedHoliday[], year: number): Promise<number> {
+async function upsertHolidays(
+  holidays: ScrapedHoliday[],
+  year: number,
+): Promise<number> {
   let count = 0;
 
   for (const holiday of holidays) {
@@ -831,19 +898,19 @@ async function upsertHolidays(holidays: ScrapedHoliday[], year: number): Promise
       where: {
         holiday_date_type_unique: {
           date: toUtcDate(holiday.date),
-          type: holiday.type
-        }
+          type: holiday.type,
+        },
       },
       create: {
         date: toUtcDate(holiday.date),
         name: holiday.name,
         type: holiday.type,
-        year
+        year,
       },
       update: {
         name: holiday.name,
-        year
-      }
+        year,
+      },
     });
     count += 1;
   }
@@ -860,9 +927,9 @@ async function scrapeHolidaysInternal(year: number): Promise<ScrapeResult> {
         year,
         sourceUrl: structuredResult.sourceUrl,
         scrapedCount: structuredResult.holidays.length,
-        upsertedCount
+        upsertedCount,
       },
-      "Finished holiday scrape"
+      "Finished holiday scrape",
     );
 
     return {
@@ -870,7 +937,7 @@ async function scrapeHolidaysInternal(year: number): Promise<ScrapeResult> {
       sourceUrl: structuredResult.sourceUrl,
       scrapedCount: structuredResult.holidays.length,
       upsertedCount,
-      holidays: structuredResult.holidays
+      holidays: structuredResult.holidays,
     };
   }
 
@@ -880,9 +947,13 @@ async function scrapeHolidaysInternal(year: number): Promise<ScrapeResult> {
 
   const holidays = parseHolidayHtml(sourceDocument.html, year);
   if (!holidays.length) {
-    throw new HttpError(422, "No holidays could be parsed from the source page", {
-      sourceUrl
-    });
+    throw new HttpError(
+      422,
+      "No holidays could be parsed from the source page",
+      {
+        sourceUrl,
+      },
+    );
   }
 
   const upsertedCount = await upsertHolidays(holidays, year);
@@ -892,11 +963,14 @@ async function scrapeHolidaysInternal(year: number): Promise<ScrapeResult> {
       sourceUrl,
       scrapedCount: holidays.length,
       upsertedCount,
-      publicHolidays: holidays.filter((holiday) => holiday.type === HolidayType.PUBLIC_HOLIDAY)
-        .length,
-      cutiBersama: holidays.filter((holiday) => holiday.type === HolidayType.CUTI_BERSAMA).length
+      publicHolidays: holidays.filter(
+        (holiday) => holiday.type === HolidayType.PUBLIC_HOLIDAY,
+      ).length,
+      cutiBersama: holidays.filter(
+        (holiday) => holiday.type === HolidayType.CUTI_BERSAMA,
+      ).length,
     },
-    "Finished holiday scrape"
+    "Finished holiday scrape",
   );
 
   return {
@@ -904,7 +978,7 @@ async function scrapeHolidaysInternal(year: number): Promise<ScrapeResult> {
     sourceUrl,
     scrapedCount: holidays.length,
     upsertedCount,
-    holidays
+    holidays,
   };
 }
 
@@ -912,6 +986,6 @@ export async function scrapeHolidays(year: number): Promise<ScrapeResult> {
   return withTimeout(
     scrapeHolidaysInternal(year),
     SCRAPER_HARD_TIMEOUT_MS,
-    `Holiday scrape for ${year}`
+    `Holiday scrape for ${year}`,
   );
 }
