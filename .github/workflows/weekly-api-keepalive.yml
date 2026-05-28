@@ -1,0 +1,24 @@
+name: Weekly API Keepalive
+
+on:
+  schedule:
+    # Runs every Monday at 07:00 WIB to keep the Supabase project active.
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+
+jobs:
+  ping-api:
+    name: Ping holidays endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    env:
+      API_BASE_URL: ${{ vars.API_BASE_URL || 'https://indonesia-holiday-api.onrender.com' }}
+
+    steps:
+      - name: Ping API endpoint that reads from Supabase
+        run: |
+          CURRENT_YEAR="$(date -u +%Y)"
+          curl --fail --silent --show-error --retry 3 --retry-delay 10 --output /dev/null \
+            --write-out "Keepalive HTTP %{http_code}\n" \
+            "${API_BASE_URL}/holidays?year=${CURRENT_YEAR}"

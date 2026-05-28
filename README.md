@@ -137,3 +137,23 @@ SCRAPER_SOURCE_URL_TEMPLATE=<optional fallback URL template containing {year}>
 ```
 
 You can also run it manually from the GitHub Actions tab and provide a `year`, for example `2026`.
+
+## Weekly API Keepalive
+
+The GitHub Actions workflow at `.github/workflows/weekly-api-keepalive.yml` runs every Monday at 07:00 WIB. It calls:
+
+```http
+GET /holidays?year=<current-year>
+```
+
+This endpoint reads from Supabase, so the scheduled request creates database activity for projects on the Supabase free tier. By default, the workflow uses:
+
+```text
+https://indonesia-holiday-api.onrender.com
+```
+
+To use another deployed API URL, add this GitHub repository variable:
+
+```text
+API_BASE_URL=<your deployed API base URL>
+```
