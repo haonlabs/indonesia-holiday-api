@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import type { ErrorRequestHandler } from "express";
 import { ZodError } from "zod";
 import { logger } from "../lib/logger";
@@ -17,6 +18,12 @@ export const errorMiddleware: ErrorRequestHandler = (error, _req, res, _next) =>
       message: error.message,
       details: error.details
     });
+    return;
+  }
+
+  if (error instanceof Prisma.PrismaClientInitializationError) {
+    logger.error({ error }, "Database is unavailable");
+    res.status(503).json({ message: "Service temporarily unavailable" });
     return;
   }
 

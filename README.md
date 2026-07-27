@@ -138,9 +138,9 @@ SCRAPER_SOURCE_URL_TEMPLATE=<optional fallback URL template containing {year}>
 
 You can also run it manually from the GitHub Actions tab and provide a `year`, for example `2026`.
 
-## Weekly API Keepalive
+## API Keepalive
 
-The GitHub Actions workflow at `.github/workflows/weekly-api-keepalive.yml` runs every Monday at 07:00 WIB. It calls:
+The GitHub Actions workflow at `.github/workflows/weekly-api-keepalive.yml` runs every eight hours. It calls:
 
 ```http
 GET /holidays?year=<current-year>

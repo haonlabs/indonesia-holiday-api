@@ -1,9 +1,9 @@
-name: Weekly API Keepalive
+name: API Keepalive
 
 on:
   schedule:
-    # Runs every Monday at 07:00 WIB to keep the Supabase project active.
-    - cron: "0 0 * * 1"
+    # Run three times daily to create enough user database activity on Supabase.
+    - cron: "17 */8 * * *"
   workflow_dispatch:
 
 jobs:
